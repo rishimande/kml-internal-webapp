@@ -20,12 +20,25 @@ A modern Next.js application built with TypeScript, Tailwind CSS, and Shadcn UI.
 npm install
 ```
 
-2. Run the development server:
+2. Set up environment variables:
+Create a `.env.local` file in the root directory and add your Google Maps API key:
+```bash
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
+```
+
+To get a Google Maps API key:
+- Go to [Google Cloud Console](https://console.cloud.google.com/google/maps-apis)
+- Create a new project or select an existing one
+- Enable the "Maps JavaScript API"
+- Create credentials (API Key)
+- Copy the API key to your `.env.local` file
+
+3. Run the development server:
 ```bash
 npm run dev
 ```
 
-3. Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+4. Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
 ## Project Structure
 

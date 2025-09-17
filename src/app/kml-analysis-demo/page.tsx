@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { MapPin, FileText, BarChart3, Download, Eye, Clock, CheckCircle, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -8,6 +8,14 @@ import { Button } from '@/components/ui/button'
 import { FileUpload } from '@/components/forms/file-upload'
 import { Navbar } from '@/components/layout/navbar'
 import { Footer } from '@/components/layout/footer'
+
+// Google Maps types
+declare global {
+  interface Window {
+    google: any
+    initMap: () => void
+  }
+}
 
 /**
  * KML Analysis Demo Page
@@ -48,6 +56,127 @@ interface AnalysisResult {
 export default function KmlAnalysisDemoPage() {
   const [analysisResults, setAnalysisResults] = useState<AnalysisResult[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
+  const [currentImageIndex, setCurrentImageIndex] = useState(0)
+  const [isMapLoaded, setIsMapLoaded] = useState(false)
+  const [hasValidApiKey, setHasValidApiKey] = useState(true)
+  const mapRef = useRef<HTMLDivElement>(null)
+  const mapInstanceRef = useRef<any>(null)
+
+  // Sample images for the carousel - using free stock images
+  const carouselImages = [
+    {
+      id: 1,
+      type: 'map',
+      title: 'Google Maps KML Viewer',
+      description: 'Interactive KML visualization with Google Maps API'
+    },
+    {
+      id: 2,
+      src: 'https://placekitten.com/800/400?image=2',
+      alt: 'KML File Processing',
+      title: 'KML File Processing'
+    },
+    {
+      id: 3,
+      src: 'https://placekitten.com/800/400?image=3',
+      alt: 'Map Visualization',
+      title: 'Map Visualization'
+    },
+    {
+      id: 4,
+      src: 'https://placekitten.com/800/400?image=4',
+      alt: 'Data Analytics Dashboard',
+      title: 'Data Analytics Dashboard'
+    },
+    {
+      id: 5,
+      src: 'https://placekitten.com/800/400?image=5',
+      alt: 'Geographic Information System',
+      title: 'Geographic Information System'
+    }
+  ]
+
+  // Load Google Maps API
+  useEffect(() => {
+    let checkInterval: NodeJS.Timeout | null = null
+
+    const loadGoogleMapsAPI = () => {
+      // Check if Google Maps is already loaded
+      if (window.google && window.google.maps) {
+        setIsMapLoaded(true)
+        return
+      }
+
+      // Check if script is already being loaded
+      const existingScript = document.querySelector('script[src*="maps.googleapis.com"]')
+      if (existingScript) {
+        // Script is already loaded or loading, just wait for it
+        checkInterval = setInterval(() => {
+          if (window.google && window.google.maps) {
+            if (checkInterval) clearInterval(checkInterval)
+            setIsMapLoaded(true)
+          }
+        }, 100)
+        return
+      }
+
+      // Only load if we have a valid API key
+      const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+      if (!apiKey || apiKey === 'YOUR_API_KEY') {
+        console.warn('Google Maps API key not found. Please set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY in your .env.local file')
+        setHasValidApiKey(false)
+        return
+      }
+
+      const script = document.createElement('script')
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&callback=initMap`
+      script.async = true
+      script.defer = true
+      script.id = 'google-maps-script'
+      document.head.appendChild(script)
+
+      window.initMap = () => {
+        setIsMapLoaded(true)
+      }
+    }
+
+    loadGoogleMapsAPI()
+
+    // Cleanup function
+    return () => {
+      if (checkInterval) {
+        clearInterval(checkInterval)
+      }
+    }
+  }, [])
+
+  // Initialize map when it's loaded and we're on the map slide
+  useEffect(() => {
+    if (isMapLoaded && currentImageIndex === 0 && mapRef.current && !mapInstanceRef.current) {
+      initMap()
+    }
+  }, [isMapLoaded, currentImageIndex])
+
+  const initMap = () => {
+    if (!mapRef.current || !window.google) return
+
+    // Create the map
+    const map = new window.google.maps.Map(mapRef.current, {
+      center: { lat: 20.0, lng: 78.0 }, // Default center (India)
+      zoom: 6,
+      mapTypeId: "satellite", // Satellite view
+    })
+
+    // Load KML file from Cloudinary URL
+    const kmlLayer = new window.google.maps.KmlLayer({
+      url: "https://res.cloudinary.com/dk983csnp/raw/upload/v1758066685/MAH-PAN_04._umrai_bismilla._khan_2biga_crt_eegquf.kml",
+      map: map,
+      preserveViewport: false,   // auto-zoom to fit KML
+      suppressInfoWindows: false // show popups if available
+    })
+
+    mapInstanceRef.current = map
+  }
 
   /**
    * Handles successful file upload and initiates analysis
@@ -152,6 +281,21 @@ export default function KmlAnalysisDemoPage() {
     return new Date(dateString).toLocaleString()
   }
 
+  /**
+   * Carousel navigation functions
+   */
+  const nextImage = () => {
+    setCurrentImageIndex((prev) => (prev + 1) % carouselImages.length)
+  }
+
+  const prevImage = () => {
+    setCurrentImageIndex((prev) => (prev - 1 + carouselImages.length) % carouselImages.length)
+  }
+
+  const goToImage = (index: number) => {
+    setCurrentImageIndex(index)
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -202,29 +346,123 @@ export default function KmlAnalysisDemoPage() {
             </Card>
           </motion.div>
 
-          {/* Analysis Results Section - KML Preview Area Style */}
+          {/* KML Preview Carousel */}
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6, delay: 0.4 }}
           >
             <div className="bg-white rounded-lg shadow-sm border p-6">
-              <div className="bg-gray-100 rounded-lg h-80 flex items-center justify-center relative">
-                {/* Placeholder for KML viewer */}
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-gray-300 rounded-full flex items-center justify-center mb-4 mx-auto">
-                    <span className="text-2xl">🌍</span>
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold mb-2">KML Preview Area</h3>
+                <p className="text-sm text-muted-foreground">Explore sample visualizations and analysis results</p>
+              </div>
+              
+              <div className="relative bg-gray-100 rounded-lg h-80 overflow-hidden group">
+                {/* Carousel Content */}
+                <motion.div
+                  key={currentImageIndex}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.3 }}
+                  className="w-full h-full"
+                >
+                  {carouselImages[currentImageIndex].type === 'map' ? (
+                    <>
+                      {/* Google Maps Container */}
+                      <div 
+                        ref={mapRef}
+                        className="w-full h-full"
+                        style={{ minHeight: '320px' }}
+                      />
+                      
+                      {/* Map Loading Overlay */}
+                      {!isMapLoaded && hasValidApiKey && (
+                        <div className="absolute inset-0 bg-gray-100 flex items-center justify-center">
+                          <div className="text-center">
+                            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                            <p className="text-sm text-gray-600">Loading Google Maps...</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* API Key Missing Overlay */}
+                      {!hasValidApiKey && (
+                        <div className="absolute inset-0 bg-gray-100 flex items-center justify-center">
+                          <div className="text-center p-4">
+                            <div className="w-16 h-16 bg-gray-300 rounded-full flex items-center justify-center mb-4 mx-auto">
+                              <span className="text-2xl">🗺️</span>
+                            </div>
+                            <h4 className="font-medium text-gray-800 mb-2">Google Maps API Key Required</h4>
+                            <p className="text-sm text-gray-600 mb-4">
+                              To view the interactive KML map, please add your Google Maps API key to the environment variables.
+                            </p>
+                            <div className="bg-gray-200 rounded p-3 text-xs font-mono text-left">
+                              <p className="text-gray-700">Add to .env.local:</p>
+                              <p className="text-blue-600">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_api_key_here</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {/* Regular Image */}
+                      <img
+                        src={carouselImages[currentImageIndex].src}
+                        alt={carouselImages[currentImageIndex].alt}
+                        className="w-full h-full object-cover"
+                      />
+                    </>
+                  )}
+                  
+                  {/* Content Overlay with Title */}
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
+                    <h4 className="text-white font-medium text-sm">
+                      {carouselImages[currentImageIndex].title}
+                    </h4>
+                    {carouselImages[currentImageIndex].description && (
+                      <p className="text-white/80 text-xs mt-1">
+                        {carouselImages[currentImageIndex].description}
+                      </p>
+                    )}
                   </div>
-                  <p className="text-gray-500">KML Preview Area</p>
-                </div>
+                </motion.div>
                 
-                {/* Navigation arrows */}
-                <Button variant="ghost" size="icon" className="absolute left-2 top-1/2 transform -translate-y-1/2">
+                {/* Navigation Arrows */}
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-white/80 hover:bg-white/90 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={prevImage}
+                >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="icon" className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-white/80 hover:bg-white/90 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={nextImage}
+                >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
+              </div>
+              
+              {/* Carousel Indicators */}
+              <div className="flex justify-center space-x-2 mt-4">
+                {carouselImages.map((_, index) => (
+                  <button
+                    key={index}
+                    onClick={() => goToImage(index)}
+                    className={`w-3 h-3 rounded-full transition-colors ${
+                      index === currentImageIndex 
+                        ? 'bg-primary' 
+                        : 'bg-gray-300 hover:bg-gray-400'
+                    }`}
+                    aria-label={`Go to image ${index + 1}`}
+                  />
+                ))}
               </div>
               
               {/* Google Earth Integration */}
@@ -232,6 +470,9 @@ export default function KmlAnalysisDemoPage() {
                 <div className="flex items-center space-x-2">
                   <span className="text-sm font-medium">Google Earth</span>
                   <ChevronDown className="h-4 w-4" />
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {currentImageIndex + 1} of {carouselImages.length}
                 </div>
               </div>
               
